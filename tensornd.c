@@ -88,13 +88,13 @@ Storage* storage_new(size_t size) {
     return storage;
 }
 
-float storage_getitem(Storage* s, int idx) {
-    myAssert(idx >= 0 && idx < s->data_size, "storage_getitem idx out of range");
+float storage_getitem(Storage* s, size_t idx) {
+    myAssert(s->data_size, "storage_getitem idx out of range");
     return s->data[idx];
 }
 
-void storage_setitem(Storage* s, int idx, float val) {
-    myAssert(idx >= 0 && idx < s->data_size, "storage_setitem idx out of range");
+void storage_setitem(Storage* s, size_t idx, float val) {
+    myAssert(idx < s->data_size, "storage_setitem idx out of range");
     s->data[idx] = val;
 }
 
@@ -156,7 +156,7 @@ size_t logical_to_physical(Tensor* t, int* idx) {
 float tensor_getitem(Tensor* t, int* idx) {
     size_t physical_idx = logical_to_physical(t, idx);
     myAssert(physical_idx < t->storage->data_size, "index out of range!");
-    return storage_getitem(t->storage, idx);
+    return storage_getitem(t->storage, physical_idx);
 }
 
 void tensor_free(Tensor* t) {
