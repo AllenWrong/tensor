@@ -110,6 +110,11 @@ void storage_decref(Storage* s) {
     }
 }
 
+void storage_share(Tensor* dest, Tensor* src) {
+    dest->storage = src->storage;
+    storage_incref(src->storage);
+}
+
 // ----------------------------------------------------------------------------
 // Tensor class functions
 
@@ -200,7 +205,7 @@ Tensor* tensor_slice_keepdim(Tensor* t, int* start, int* end, int* step) {
 Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step) {
     // create new slice tensor
     Tensor* slice_t = mallocCheck(sizeof(Tensor));
-    slice_t->storage = t->storage;
+    storage_share(slice_t, t);
 
     int size[t->ndim];
     int offset[t->ndim];
