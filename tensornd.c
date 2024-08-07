@@ -216,6 +216,7 @@ Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step) {
     for (int i = 0; i < t->ndim; i++) {
         if ((end[i] == start[i]+1) && (step[i] == 1)) {
             prev_offset = t->stride[i] * start[i];
+            size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
         } else {
             size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
             offset[slice_t_ndim] = t->stride[i] * start[i];
