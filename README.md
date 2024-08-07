@@ -5,15 +5,39 @@
 [`tensor1d.c` readme](https://github.com/EurekaLabsAI/tensor)
 
 
-TODOs:
+**currently support**
 
-- APIs
-  - tensor_slice()
+- create tensor
+  - create empty tensor using shape
+  - create tensor using np.ndarray
+- tensor getitem
+  - get a float item
+- tensor nelement
+- tensor.item()
+- get tensor meta data
+  - ndim
+  - shape
+
+
+**currently testing**
+
+- slice tensor
+- slice tensor keepdim
+
+
+**TODOs:**
+
+- feature
+  - create tensor using list, tuple
+  - get tensor item as tensor
+  - slice tensor
+  - slice tensor keepdim
   - tensor_setitem()
   - tensor_slice_setitem()
 - make tests better
-- make code more readaable
-- add doc
+- make the code more readable and cleaner
+- write a post to explain my implementation and help greeners approach this comfortable
+
 
 Good related resources:
 - [PyTorch internals](http://blog.ezyang.com/2019/05/pytorch-internals/)

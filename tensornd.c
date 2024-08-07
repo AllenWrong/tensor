@@ -47,6 +47,9 @@ void *malloc_check(size_t size, const char *file, int line) {
         } \
     } while (0)
 
+// ----------------------------------------------------------------------------
+// utils
+
 size_t _prod(int* size, int ndim, int start) {
     myAssert(start < ndim, "ValueError: start should < ndim");
     size_t result = 1;
@@ -74,12 +77,25 @@ int ceil_div(int a, int b) {
     return (a + b - 1) / b;
 }
 
+// ----------------------------------------------------------------------------
+// Storage: simple array of floats. The memory where the data is actually stored.
+
 Storage* storage_new(size_t size) {
     Storage* storage = mallocCheck(sizeof(Storage));
     storage->data_size = size;
     storage->ref_count = 1;
     storage->data = mallocCheck(size * sizeof(float));
     return storage;
+}
+
+float storage_getitem(Storage* s, int idx) {
+    myAssert(idx >= 0 && idx < s->data_size, "storage_getitem idx out of range");
+    return s->data[idx];
+}
+
+void storage_setitem(Storage* s, int idx, float val) {
+    myAssert(idx >= 0 && idx < s->data_size, "storage_setitem idx out of range");
+    s->data[idx] = val;
 }
 
 void storage_incref(Storage* s) {
@@ -94,31 +110,39 @@ void storage_decref(Storage* s) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Tensor class functions
+
+// torch.empty(size)
 Tensor* tensor_empty(int* size, int ndim) {
     Tensor* t = mallocCheck(sizeof(Tensor));
     size_t data_size = _prod(size, ndim, 0);
     t->storage = storage_new(data_size);
-    t->ndim = ndim;
 
+    // malloc mem for meta data
     _malloc_size_offset_stride(t);
-
+    // init meta data
+    t->ndim = ndim;
     memcpy(t->size, size, ndim * sizeof(int));
     memset(t->offset, 0, ndim * sizeof(int));
     _set_stride(t->stride, t->size, t->ndim);
-
     t->repr = NULL;
 
     return t;
 }
 
+// tensor_a.nelement()
 size_t nelement(Tensor* t) {
-    return t->storage->data_size;
+    return _prod(t->size, t->ndim, 0);
 }
 
+// copy numpy array to tensor
 void tensor_copy_np(Tensor* t, float* data) {
     memcpy(t->storage->data, data, t->storage->data_size * sizeof(float));
 }
 
+// convert index
+// TODO: write a blog to explain this.
 size_t logical_to_physical(Tensor* t, int* idx) {
     int step = 1;
     size_t physical_idx = 0;
@@ -128,10 +152,11 @@ size_t logical_to_physical(Tensor* t, int* idx) {
     return physical_idx;
 }
 
+// get a single value.
 float tensor_getitem(Tensor* t, int* idx) {
     size_t physical_idx = logical_to_physical(t, idx);
     myAssert(physical_idx < t->storage->data_size, "index out of range!");
-    return t->storage->data[physical_idx];
+    return storage_getitem(t->storage, idx);
 }
 
 void tensor_free(Tensor* t) {

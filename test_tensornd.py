@@ -52,16 +52,16 @@ def test_tensor_item(size):
         t.item()
 
 
-import numpy as np
+# import numpy as np
 
-data = np.random.rand(2, 3).astype('float32')
-print(data.dtype)
-print(data[1, 1])
-t = tensornd.Tensor(data=data)
-print(t.ndim)
-print(t.shape)
-print(t.nelement())
-a = t[1, :]
+# data = np.random.rand(2, 3).astype('float32')
+# print(data.dtype)
+# print(data[1, 1])
+# t = tensornd.Tensor(data=data)
+# print(t.ndim)
+# print(t.shape)
+# print(t.nelement())
+# a = t[1, :]
 
-print(type(a))
-print(a.shape)
+# print(type(a))
+# print(a.shape)
