@@ -12,6 +12,7 @@ typedef struct {
 typedef struct {
     Storage* storage;
     int ndim;
+    int idx;  // for 0d tensor
     int* size;
     int* offset;
     int* stride;

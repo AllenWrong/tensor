@@ -123,11 +123,11 @@ Tensor* tensor_empty(int* size, int ndim) {
     Tensor* t = mallocCheck(sizeof(Tensor));
     size_t data_size = _prod(size, ndim, 0);
     t->storage = storage_new(data_size);
-
-    // malloc mem for meta data
-    _malloc_size_offset_stride(t);
     // init meta data
     t->ndim = ndim;
+    t->idx = 0;
+    // malloc mem for meta data
+    _malloc_size_offset_stride(t);
     memcpy(t->size, size, ndim * sizeof(int));
     memset(t->offset, 0, ndim * sizeof(int));
     _set_stride(t->stride, t->size, t->ndim);
@@ -177,12 +177,13 @@ Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step) {
     Tensor* slice_t = mallocCheck(sizeof(Tensor));
     storage_share(slice_t, t);
     slice_t->ndim = t->ndim;
+    slice_t->repr = NULL;
 
     _malloc_size_offset_stride(slice_t);
 
     for (int i = 0; i < t->ndim; i++) {
         slice_t->size[i] = ceil_div(end[i] - start[i], step[i]);
-        slice_t->offset[i] = t->stride[i] * start[i];
+        slice_t->offset[i] = t->stride[i] * start[i] + t->offset[i];
         slice_t->stride[i] = t->stride[i] * step[i];
     }
     return slice_t;
@@ -203,11 +204,11 @@ Tensor* tensor_slice_squeeze(Tensor* t, int* start, int* end, int* step, bool* s
     int prev_offset = 0;
     for (int i = 0; i < t->ndim; i++) {
         if (skip[i]) {
-            prev_offset = t->stride[i] * start[i];
+            prev_offset = t->stride[i] * start[i] + t->offset[i];
             size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
         } else {
             size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
-            offset[slice_t_ndim] = t->stride[i] * start[i];
+            offset[slice_t_ndim] = t->stride[i] * start[i] + t->offset[i];
             stride[slice_t_ndim] = t->stride[i] * step[i];
 
             if (prev_offset != 0) {
@@ -219,6 +220,10 @@ Tensor* tensor_slice_squeeze(Tensor* t, int* start, int* end, int* step, bool* s
     }
 
     slice_t->ndim = slice_t_ndim;
+    // for 0d tensor
+    if (slice_t->ndim == 0) {
+        slice_t->idx = logical_to_physical(t, start);
+    }
     _malloc_size_offset_stride(slice_t);
     memcpy(slice_t->size, size, slice_t_ndim * sizeof(int));
     memcpy(slice_t->offset, offset, slice_t_ndim * sizeof(int));
@@ -236,6 +241,10 @@ void tensor_free(Tensor* t) {
 }
 
 float tensor_item(Tensor* t) {
+    if (t->ndim == 0) {
+        return storage_getitem(t->storage, t->idx);
+    }
+
     if (nelement(t) != 1) {
         fprintf(stderr, "ValueError: can only convert an array of size 1 to a Python scalar\n");
         return NAN;
@@ -266,6 +275,10 @@ int* offset(Tensor* t) {
 int ndim(Tensor* t) {
     return t->ndim;
 }
+
+
+// ----------------------------------------------------------------------------
+// temp stuff
 
 // chatgpt write this function.
 // just a helper function. help us to see the data.

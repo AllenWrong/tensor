@@ -70,9 +70,9 @@ def _index_type(index, ndim):
         assert isinstance(index, Sequence), \
         f"ValueError: type(index)={type(index)} must be one of int or Sequence."
         
-        if all([isinstance(it, int)] for it in index) and len(index) == ndim:
+        if all([isinstance(it, int) for it in index]) and len(index) == ndim:
             return ONLY_INT
-        elif all([isinstance(it, slice)] for it in index):
+        elif all([isinstance(it, slice) for it in index]):
             return ONLY_SLICE
         else:
             return SLICE_AND_INT
@@ -153,6 +153,7 @@ class Tensor:
         return lib.tensor_getitem_astensor(self.data, index)
 
     def __getitem__(self, index):
+        print("----", index, _index_type(index, self.ndim))
         if index is None:
             return self
         
@@ -173,6 +174,7 @@ class Tensor:
         
         elif _index_type(index, self.ndim) == SLICE_AND_INT:
             start, end, stop, sequeeze = _process_index(index, self.shape, ONLY_INT)
+            print(start, end, stop, sequeeze)
             c_tensor = lib.tensor_slice_squeeze(self.data, start, end, stop, sequeeze)
             return tensor(c_tensor)
         else:

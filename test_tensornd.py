@@ -13,22 +13,20 @@ def _prod(arr):
     return reduce(mul, arr)
 
 
+def is_close(a, b):
+    if isinstance(a, tensornd.Tensor):
+        a = a.item()
+    return math.isclose(a, b, rel_tol=1e-7)
+
 def tensor_eq_nparr(tensor, nparr):
     if isinstance(tensor, float):
         assert isinstance(nparr, float) and (tensor == nparr)
 
     assert tensor.shape == nparr.shape
 
-    # tensor_list = tensor.tolist()
-    # np_list = nparr.flatten().tolist()
-    # assert tensor_list == np_list
-
     all_indices = list(itertools.product(*[range(dim) for dim in tensor.shape]))
-    print(all_indices)
     for it in all_indices:
-        import pdb
-        pdb.set_trace()
-        assert math.isclose(tensor[it].item(), nparr[it], rel_tol=1e-7)
+        assert is_close(tensor[it].item(), nparr[it])
 
 
 def generate_slices(shape, num=None):
@@ -95,17 +93,44 @@ def test_slice_1d(size):
     data = np.random.rand(*size)
     t = tensornd.tensor(data=data)
 
+    assert is_close(t[10], data[10])
     tensor_eq_nparr(t[:3], data[:3])
+    tensor_eq_nparr(t[4:10], data[4:10])
+    tensor_eq_nparr(t[10:], data[10:])
+    tensor_eq_nparr(t[:], data[:])
+
+
+@pytest.mark.parametrize("size", [
+    (10,10),
+])
+def test_slice_2d(size):
+    data = np.random.rand(*size)
+    t = tensornd.tensor(data=data)
+
+    assert is_close(t[0, 0], data[0, 0])
+    assert is_close(t[1, 2], data[1, 2])
+    assert is_close(t[9, 9], data[9, 9])
+    
+    tensor_eq_nparr(t[:, :], data[:, :])
+
+    tensor_eq_nparr(t[0, 1:5], data[0, 1:5])
+    tensor_eq_nparr(t[9, 3:], data[9, 3:])
+    tensor_eq_nparr(t[8, :5], data[8, :5])
+
+    # tensor_eq_nparr(t[2:5, 1], data[2:5, 1])
+    # tensor_eq_nparr(t[:6, 2], data[:6, 2])
+    # tensor_eq_nparr(t[3:, 4], data[3:, 4])
+
     # tensor_eq_nparr(t[4:10], data[4:10])
     # tensor_eq_nparr(t[10:], data[10:])
     # tensor_eq_nparr(t[:], data[:])
 
 
-import numpy as np
+# import numpy as np
 
-data = np.random.rand(3)
-print(data)
-t = tensornd.tensor(data)
-t = t[(1,)]
+# data = np.random.rand(3)
+# print(data)
+# t = tensornd.tensor(data)
+# t = t[2:]
 
-print(t.shape, t.ndim, t.stride, t.offset)
+# print(t.item())
