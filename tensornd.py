@@ -1,6 +1,6 @@
 import cffi
 import numpy as np
-
+from typing import Sequence
 
 # -----------------------------------------------------------------------------
 ffi = cffi.FFI()
@@ -25,15 +25,28 @@ size_t nelement(Tensor* t);
 void tensor_copy_np(Tensor* t, float* data);
 size_t logical_to_physical(Tensor* t, int* idx);
 float tensor_getitem(Tensor* t, int* idx);
-Tensor* tensor_slice_keepdim(Tensor* t, int* start, int* end, int* step);
+Tensor* tensor_getitem_astensor(Tensor* t, int* idx);
 Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step);
+Tensor* tensor_slice_squeeze(Tensor* t, int* start, int* end, int* step, bool* skip);
 float tensor_item(Tensor* t);
 int* shape(Tensor* t);
+int* stride(Tensor* t);
+int* offset(Tensor* t);
 int ndim(Tensor* t);
 void tensor_free(Tensor* t);
+char* tensor_to_string(Tensor* t);
 """)
 lib = ffi.dlopen("./libtensornd.so")  # Make sure to compile the C code into a shared library
 # -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
+# const
+
+IS_INT = 0
+ONLY_INT = 1
+ONLY_SLICE = 2
+SLICE_AND_INT = 3
 
 
 # -----------------------------------------------------------------------------
@@ -42,25 +55,63 @@ lib = ffi.dlopen("./libtensornd.so")  # Make sure to compile the C code into a s
 def _get_nparr_data_pointer(np_arr: np.ndarray):
     return ffi.cast('float *', np_arr.ctypes.data)
 
-def _is_item_index(idx):
-    if isinstance(idx, tuple):
-        return all([isinstance(it, int) for it in idx])
+def _tuple_it(it):
+    if not isinstance(it, Sequence):
+        return (it,)
+    return it
+
+def _index_type(index, ndim):
+    # only return index type
+    if isinstance(index, int):
+        return IS_INT
+    elif isinstance(index, slice):
+        return ONLY_SLICE
     else:
-        return isinstance(idx, int)
-
-
-def _process_index(idx, shape):
-    start, end, step = [], [], []
-    for i, it in enumerate(idx):
-        if isinstance(it, int):
-            start.append(it), end.append(it+1), step.append(1)
-        elif isinstance(it, slice):
-            start.append(it.start if it.start is not None else 0)
-            end.append(it.stop if it.stop is not None else shape[i])
-            step.append(it.step if it.step is not None else 1)
+        assert isinstance(index, Sequence), \
+        f"ValueError: type(index)={type(index)} must be one of int or Sequence."
+        
+        if all([isinstance(it, int)] for it in index) and len(index) == ndim:
+            return ONLY_INT
+        elif all([isinstance(it, slice)] for it in index):
+            return ONLY_SLICE
         else:
-            raise TypeError(f"TypeError: unsupport type '{type(it)}'")
-    return start, end, step
+            return SLICE_AND_INT
+
+def _process_index(idx, shape, index_type):
+    """ensure the returned value is valid"""
+    def _format_index():
+        start, end, step, sequeeze = [], [], [], []
+        for i, it in enumerate(_tuple_it(idx)):
+            if isinstance(it, int):
+                start.append(it), end.append(it+1), step.append(1)
+                sequeeze.append(True)
+            elif isinstance(it, slice):
+                start.append(it.start if it.start is not None else 0)
+                end.append(it.stop if it.stop is not None else shape[i])
+                step.append(it.step if it.step is not None else 1)
+                sequeeze.append(False)
+            else:
+                raise TypeError(f"TypeError: unsupport type '{type(it)}'")
+        
+        for i in range(len(start), len(shape)):
+            start.append(0)
+            end.append(shape[i])
+            step.append(1)
+            sequeeze.append(False)
+        
+        return start, end, step, sequeeze
+    
+    if index_type == IS_INT:
+        return _format_index()
+        
+    elif index_type == ONLY_SLICE:
+        return _format_index()
+        
+    elif index_type == ONLY_INT:
+        return _format_index()
+    
+    elif index_type == SLICE_AND_INT:
+        return _format_index()
 
 
 class Tensor:
@@ -98,17 +149,38 @@ class Tensor:
             if hasattr(self, 'data'):
                 lib.tensor_free(self.data)
 
+    def _get_item_1d(self, index):
+        return lib.tensor_getitem_astensor(self.data, index)
+
     def __getitem__(self, index):
-        if _is_item_index(index):
-            return lib.tensor_getitem(self.data, index)
-        else:
-            start, end, step = _process_index(index, self.shape)
+        if index is None:
+            return self
+        
+        if _index_type(index, self.ndim) == IS_INT:
+            start, end, stop, sequeeze = _process_index(index, self.shape, IS_INT)
+            c_tensor = lib.tensor_slice_squeeze(self.data, start, end, stop, sequeeze)
+            return tensor(c_tensor)
+        
+        elif _index_type(index, self.ndim) == ONLY_SLICE:
+            start, end, step, _ = _process_index(index, self.shape, ONLY_SLICE)
             c_tensor = lib.tensor_slice(self.data, start, end, step)
             return tensor(c_tensor)
+        
+        elif _index_type(index, self.ndim) == ONLY_INT:
+            start, end, stop, sequeeze = _process_index(index, self.shape, ONLY_INT)
+            c_tensor = lib.tensor_slice_squeeze(self.data, start, end, stop, sequeeze)
+            return tensor(c_tensor)
+        
+        elif _index_type(index, self.ndim) == SLICE_AND_INT:
+            start, end, stop, sequeeze = _process_index(index, self.shape, ONLY_INT)
+            c_tensor = lib.tensor_slice_squeeze(self.data, start, end, stop, sequeeze)
+            return tensor(c_tensor)
+        else:
+            raise ValueError("value error in _index_type return")
 
     def nelement(self) -> int:
         return lib.nelement(self.data)
-    
+        
     def item(self) -> float:
         if self.nelement() != 1:
             raise ValueError("ValueError: can only convert an array of size 1 to a Python scalar")
@@ -122,6 +194,13 @@ class Tensor:
     def shape(self):
         return tuple(ffi.cast('int*', lib.shape(self.data))[i] for i in range(self.ndim))
     
+    @property
+    def stride(self):
+        return tuple(ffi.cast('int*', lib.stride(self.data))[i] for i in range(self.ndim))
+    
+    @property
+    def offset(self):
+        return tuple(ffi.cast('int*', lib.offset(self.data))[i] for i in range(self.ndim))
 
 def empty(shape):
     return Tensor(shape=shape)

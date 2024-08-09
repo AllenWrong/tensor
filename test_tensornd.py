@@ -5,6 +5,8 @@ from operator import mul
 import numpy as np
 import itertools
 import math
+import itertools
+import random
 
 
 def _prod(arr):
@@ -12,10 +14,43 @@ def _prod(arr):
 
 
 def tensor_eq_nparr(tensor, nparr):
+    if isinstance(tensor, float):
+        assert isinstance(nparr, float) and (tensor == nparr)
+
     assert tensor.shape == nparr.shape
+
+    # tensor_list = tensor.tolist()
+    # np_list = nparr.flatten().tolist()
+    # assert tensor_list == np_list
+
     all_indices = list(itertools.product(*[range(dim) for dim in tensor.shape]))
+    print(all_indices)
     for it in all_indices:
-        assert math.isclose(tensor[it], nparr[it], rel_tol=1e-7)
+        import pdb
+        pdb.set_trace()
+        assert math.isclose(tensor[it].item(), nparr[it], rel_tol=1e-7)
+
+
+def generate_slices(shape, num=None):
+    """thank chatgpt for writting this function"""
+    dims = len(shape)
+    all_slices = []
+
+    for indices in itertools.product(*[range(shape[i]+1) for i in range(dims)]):
+        slice_obj = []
+        for i, index in enumerate(indices):
+            if index == 0:
+                slice_obj.append(slice(None))
+            elif index == shape[i]:
+                slice_obj.append(slice(index))
+            else:
+                slice_obj.append(slice(index-1, index))
+        all_slices.append(tuple(slice_obj))
+
+    if num is None:
+        num = _prod(shape) // 2
+    
+    return random.sample(all_slices, num)
 
 
 @pytest.mark.parametrize("size", [
@@ -39,6 +74,7 @@ def test_getitem(size):
     t = tensornd.tensor(data=data)
     tensor_eq_nparr(t, data)
 
+
 @pytest.mark.parametrize("size", [
     [1], [1, 1, 1], [1, 2], [2, 1]
 ])
@@ -52,16 +88,24 @@ def test_tensor_item(size):
         t.item()
 
 
-# import numpy as np
+@pytest.mark.parametrize("size", [
+    (50,),
+])
+def test_slice_1d(size):
+    data = np.random.rand(*size)
+    t = tensornd.tensor(data=data)
 
-# data = np.random.rand(2, 3).astype('float32')
-# print(data.dtype)
-# print(data[1, 1])
-# t = tensornd.Tensor(data=data)
-# print(t.ndim)
-# print(t.shape)
-# print(t.nelement())
-# a = t[1, :]
+    tensor_eq_nparr(t[:3], data[:3])
+    # tensor_eq_nparr(t[4:10], data[4:10])
+    # tensor_eq_nparr(t[10:], data[10:])
+    # tensor_eq_nparr(t[:], data[:])
 
-# print(type(a))
-# print(a.shape)
+
+import numpy as np
+
+data = np.random.rand(3)
+print(data)
+t = tensornd.tensor(data)
+t = t[(1,)]
+
+print(t.shape, t.ndim, t.stride, t.offset)

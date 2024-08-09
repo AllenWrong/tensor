@@ -22,14 +22,19 @@ Tensor* tensor_empty(int* size, int ndim);
 size_t nelement(Tensor* t);
 void tensor_copy_np(Tensor* t, float* data);
 size_t logical_to_physical(Tensor* t, int* idx);
+
 float tensor_getitem(Tensor* t, int* idx);
-Tensor* tensor_slice_keepdim(Tensor* t, int* start, int* end, int* step);
+
+Tensor* tensor_getitem_astensor(Tensor* t, int* idx);
 Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step);
+Tensor* tensor_slice_squeeze(Tensor* t, int* start, int* end, int* step, bool* skip);
+
 float tensor_item(Tensor* t);
 int* shape(Tensor* t);
+int* stride(Tensor* t);
+int* offset(Tensor* t);
 int ndim(Tensor* t);
 
-// Tensor* tensor_getitem_astensor(Tensor* t, int* index);
 
 // void tensor_setitem(Tensor* t, int* index, float val);
 // void tensor_slice_set_item(Tensor* t, index* index, Tensor* t);

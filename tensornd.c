@@ -51,7 +51,7 @@ void *malloc_check(size_t size, const char *file, int line) {
 // utils
 
 size_t _prod(int* size, int ndim, int start) {
-    myAssert(start < ndim, "ValueError: start should < ndim");
+    myAssert(start <= ndim, "ValueError: start should < ndim");
     size_t result = 1;
     for (int i = start; i < ndim; i++) {
         result *= size[i];
@@ -164,6 +164,68 @@ float tensor_getitem(Tensor* t, int* idx) {
     return storage_getitem(t->storage, physical_idx);
 }
 
+// for slice like: tensor_t[1, 1, 1]
+// index contains only integer
+Tensor* tensor_getitem_astensor(Tensor* t, int* idx) {
+    return NULL;
+}
+
+// for slice like: tensor_t[1:2, 3:10]
+// index contains only slice
+Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step) {
+    // create new slice tensor
+    Tensor* slice_t = mallocCheck(sizeof(Tensor));
+    storage_share(slice_t, t);
+    slice_t->ndim = t->ndim;
+
+    _malloc_size_offset_stride(slice_t);
+
+    for (int i = 0; i < t->ndim; i++) {
+        slice_t->size[i] = ceil_div(end[i] - start[i], step[i]);
+        slice_t->offset[i] = t->stride[i] * start[i];
+        slice_t->stride[i] = t->stride[i] * step[i];
+    }
+    return slice_t;
+}
+
+// for slice like: tensor_t[0, 1:2, 4:10]
+// index contains slice and integer
+Tensor* tensor_slice_squeeze(Tensor* t, int* start, int* end, int* step, bool* skip) {
+    // create new slice tensor
+    Tensor* slice_t = mallocCheck(sizeof(Tensor));
+    storage_share(slice_t, t);
+
+    int size[t->ndim];
+    int offset[t->ndim];
+    int stride[t->ndim];
+    
+    int slice_t_ndim = 0;
+    int prev_offset = 0;
+    for (int i = 0; i < t->ndim; i++) {
+        if (skip[i]) {
+            prev_offset = t->stride[i] * start[i];
+            size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
+        } else {
+            size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
+            offset[slice_t_ndim] = t->stride[i] * start[i];
+            stride[slice_t_ndim] = t->stride[i] * step[i];
+
+            if (prev_offset != 0) {
+                offset[slice_t_ndim] += prev_offset;
+                prev_offset = 0;
+            }
+            slice_t_ndim += 1;
+        }
+    }
+
+    slice_t->ndim = slice_t_ndim;
+    _malloc_size_offset_stride(slice_t);
+    memcpy(slice_t->size, size, slice_t_ndim * sizeof(int));
+    memcpy(slice_t->offset, offset, slice_t_ndim * sizeof(int));
+    memcpy(slice_t->stride, stride, slice_t_ndim * sizeof(int));
+    return slice_t;
+}
+
 void tensor_free(Tensor* t) {
     storage_decref(t->storage);
     free(t->size);
@@ -186,60 +248,19 @@ float tensor_item(Tensor* t) {
     return tensor_getitem(t, idx);
 }
 
-Tensor* tensor_slice_keepdim(Tensor* t, int* start, int* end, int* step) {
-    // create new slice tensor
-    Tensor* slice_t = mallocCheck(sizeof(Tensor));
-    slice_t->storage = t->storage;
-    slice_t->ndim = t->ndim;
-
-    _malloc_size_offset_stride(t);
-
-    for (int i = 0; i < t->ndim; i++) {
-        slice_t->size[i] = ceil_div(end[i] - start[i], step[i]);
-        slice_t->offset[i] = t->stride[i] * start[i];
-        slice_t->stride[i] = t->stride[i] * step[i];
-    }
-    return slice_t;
-}
-
-Tensor* tensor_slice(Tensor* t, int* start, int* end, int* step) {
-    // create new slice tensor
-    Tensor* slice_t = mallocCheck(sizeof(Tensor));
-    storage_share(slice_t, t);
-
-    int size[t->ndim];
-    int offset[t->ndim];
-    int stride[t->ndim];
-    
-    int slice_t_ndim = 0;
-    int prev_offset = 0;
-    for (int i = 0; i < t->ndim; i++) {
-        if ((end[i] == start[i]+1) && (step[i] == 1)) {
-            prev_offset = t->stride[i] * start[i];
-            size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
-        } else {
-            size[slice_t_ndim] = ceil_div(end[i] - start[i], step[i]);
-            offset[slice_t_ndim] = t->stride[i] * start[i];
-            stride[slice_t_ndim] = t->stride[i] * step[i];
-
-            if (prev_offset != 0) {
-                offset[slice_t_ndim] += prev_offset;
-                prev_offset = 0;
-            }
-            slice_t_ndim += 1;
-        }
-    }
-
-    slice_t->ndim = slice_t_ndim;
-    _malloc_size_offset_stride(slice_t);
-    memcpy(slice_t->size, size, t->ndim * sizeof(int));
-    memcpy(slice_t->offset, offset, t->ndim * sizeof(int));
-    memcpy(slice_t->stride, stride, t->ndim * sizeof(int));
-    return slice_t;
-}
+// ----------------------------------------------------------------------------
+// Tensor metadata
 
 int* shape(Tensor* t) {
     return t->size;
+}
+
+int* stride(Tensor* t) {
+    return t->stride;
+}
+
+int* offset(Tensor* t) {
+    return t->offset;
 }
 
 int ndim(Tensor* t) {
