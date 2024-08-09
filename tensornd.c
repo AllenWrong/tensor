@@ -260,21 +260,13 @@ float tensor_item(Tensor* t) {
 // ----------------------------------------------------------------------------
 // Tensor metadata
 
-int* shape(Tensor* t) {
-    return t->size;
-}
+int* shape(Tensor* t) {return t->size;}
 
-int* stride(Tensor* t) {
-    return t->stride;
-}
+int* stride(Tensor* t) {return t->stride;}
 
-int* offset(Tensor* t) {
-    return t->offset;
-}
+int* offset(Tensor* t) {return t->offset;}
 
-int ndim(Tensor* t) {
-    return t->ndim;
-}
+int ndim(Tensor* t) {return t->ndim;}
 
 
 // ----------------------------------------------------------------------------
